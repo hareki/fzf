@@ -1518,7 +1518,7 @@ func borderLines(shape tui.BorderShape) int {
 func borderColumns(shape tui.BorderShape, borderWidth int) int {
 	columns := 0
 	if shape.HasLeft() {
-		columns += 1 + borderWidth
+		columns += borderWidth
 	}
 	if shape.HasRight() {
 		columns += 1 + borderWidth
@@ -1855,7 +1855,7 @@ func getScrollbar(perLine int, total int, height int, offset int) (int, int) {
 }
 
 func (t *Terminal) barCol() int {
-	if len(t.scrollbar) == 0 && !t.listBorderShape.HasRight() && !t.borderShape.HasRight() && !t.hasPreviewWindowOnRight() {
+	if len(t.scrollbar) == 0 && (t.listBorderShape.HasRight() || !t.hasPreviewWindowOnRight()) {
 		return 0
 	}
 	return 1
@@ -2383,6 +2383,9 @@ func (t *Terminal) adjustMarginAndPadding() (int, int, [4]int, [4]int) {
 		case tui.BorderRounded, tui.BorderSharp, tui.BorderBold, tui.BorderBlock, tui.BorderThinBlock, tui.BorderDouble, tui.BorderDashed:
 			extraMargin[idx] += 1 + bw*(idx%2)
 		}
+		if idx == 3 && t.borderShape.HasLeft() {
+			extraMargin[idx]--
+		}
 		marginInt[idx] = sizeSpecToInt(idx, sizeSpec) + extraMargin[idx]
 	}
 
@@ -2644,8 +2647,8 @@ func (t *Terminal) resizeWindows(forcePreview bool, redrawBorder bool) {
 		offsets[3] += 1
 	}
 	if t.borderShape.HasLeft() {
-		offsets[1] -= 1 + bw
-		offsets[2] += 1 + bw
+		offsets[1] -= bw
+		offsets[2] += bw
 	}
 	if t.border == nil && t.borderShape.Visible() {
 		t.border = t.tui.NewWindow(
@@ -2687,7 +2690,7 @@ func (t *Terminal) resizeWindows(forcePreview bool, redrawBorder bool) {
 		case posLeft, posRight:
 			minListWidth := minWidth
 			if t.listBorderShape.HasLeft() {
-				minListWidth += 2
+				minListWidth++
 			}
 			if t.listBorderShape.HasRight() {
 				minListWidth++
@@ -2874,8 +2877,8 @@ func (t *Terminal) resizeWindows(forcePreview bool, redrawBorder bool) {
 			innerHeight--
 		}
 		if t.listBorderShape.HasLeft() {
-			innerWidth -= 2
-			innerMarginInt[3] += 2
+			innerWidth--
+			innerMarginInt[3]++
 		}
 		if t.listBorderShape.HasRight() {
 			innerWidth--
@@ -2885,9 +2888,9 @@ func (t *Terminal) resizeWindows(forcePreview bool, redrawBorder bool) {
 	t.areaLines = height
 	t.areaColumns = width
 
-	// If none of the inner borders has the right side, but the outer border does, increase the list width by 1 column
-	listStickToRight := t.borderShape.HasRight() && !t.listBorderShape.HasRight() && !t.inputBorderShape.HasRight() &&
-		(!t.headerVisible || !t.headerBorderShape.HasRight() || t.visibleHeaderLines() == 0)
+	// If the outer border has the right side, give its blank column to whatever sits
+	// next to it, inner borders included, so nothing is padded from the border
+	listStickToRight := t.borderShape.HasRight()
 
 	// Set up preview window
 	noBorder := tui.MakeBorderStyle(tui.BorderNone, t.unicode)
@@ -2953,7 +2956,7 @@ func (t *Terminal) resizeWindows(forcePreview bool, redrawBorder bool) {
 				pwidth -= borderColumns(shape, bw)
 				pheight -= borderLines(shape)
 				if shape.HasLeft() {
-					x += 1 + bw
+					x += bw
 				}
 				if shape.HasTop() {
 					y += 1
@@ -2961,6 +2964,9 @@ func (t *Terminal) resizeWindows(forcePreview bool, redrawBorder bool) {
 				if len(t.scrollbar) > 0 && !shape.HasRight() {
 					// Need a column to show scrollbar
 					pwidth -= 1
+				} else if len(t.scrollbar) == 0 && shape.HasRight() {
+					// No scrollbar to fill the column next to the right border
+					pwidth++
 				}
 				t.pwindow = t.tui.NewWindow(y, x, pwidth, pheight, tui.WindowPreview, noBorder, true)
 				t.pwindow.SetWrapSign(t.previewWrapSign, t.previewWrapSignWidth)
@@ -2990,7 +2996,6 @@ func (t *Terminal) resizeWindows(forcePreview bool, redrawBorder bool) {
 				if previewOpts.hidden {
 					return 0, true
 				}
-				listStickToRight = listStickToRight && !previewOpts.Border(t.layout).HasRight()
 				if listStickToRight {
 					innerWidth++
 					width++
@@ -3059,8 +3064,9 @@ func (t *Terminal) resizeWindows(forcePreview bool, redrawBorder bool) {
 				}
 				if previewOpts.position == posLeft {
 					// Put scrollbar closer to the right border for consistent look
-					if t.borderShape.HasRight() && !hasListBorder {
+					if listStickToRight {
 						innerWidth++
+						width++
 					}
 					// Add a 1-column margin between the preview window and the main window
 					m := 0
@@ -3087,7 +3093,6 @@ func (t *Terminal) resizeWindows(forcePreview bool, redrawBorder bool) {
 					//  fzf --preview 'seq 500' --preview-window border-left --border
 					//  fzf --preview 'seq 500' --preview-window border-left --border --list-border
 					//  fzf --preview 'seq 500' --preview-window border-left --border --input-border
-					listStickToRight = t.borderShape.HasRight() && !previewOpts.Border(t.layout).HasRight()
 					if listStickToRight {
 						innerWidth++
 						width++
@@ -3157,7 +3162,7 @@ func (t *Terminal) resizeWindows(forcePreview bool, redrawBorder bool) {
 			top++
 		}
 		if shape.HasLeft() {
-			left += t.borderWidth + 1
+			left += t.borderWidth
 		}
 		width := b.Width() - borderColumns(shape, t.borderWidth) - shift
 		if shape.HasRight() {
@@ -3179,7 +3184,7 @@ func (t *Terminal) resizeWindows(forcePreview bool, redrawBorder bool) {
 		btop := inputBorderTop()
 		shift := 0
 		if !t.inputBorderShape.HasLeft() && t.listBorderShape.HasLeft() {
-			shift += t.borderWidth + 1
+			shift += t.borderWidth
 		}
 		t.inputBorder = t.tui.NewWindow(
 			btop,
@@ -3526,13 +3531,22 @@ func (t *Terminal) printInfoImpl() {
 			t.window.Print(strings.Repeat(" ", fillLength+1))
 		}
 	}
+	// The blank column printSeparator ends the line with lines up with the list's
+	// scrollbar column, so without one the separator runs up to the right border
+	printSeparatorToEnd := func(fillLength int) {
+		if t.barCol() > 0 {
+			printSeparator(fillLength, false)
+		} else if separatorLen > 0 {
+			t.separator(t.window, fillLength+1)
+		}
+	}
 
 	if t.infoStyle == infoHidden {
 		if separatorLen > 0 {
 			if !move(line+1, 0, false) {
 				return
 			}
-			printSeparator(t.window.Width()-1, false)
+			printSeparatorToEnd(t.window.Width() - 1)
 		}
 		return
 	}
@@ -3609,7 +3623,7 @@ func (t *Terminal) printInfoImpl() {
 	}
 
 	if t.infoStyle == infoRight {
-		maxWidth := t.window.Width() - 1
+		maxWidth := t.window.Width() - t.barCol()
 		if t.reading {
 			// Need space for spinner and a margin column
 			maxWidth -= 2
@@ -3617,9 +3631,9 @@ func (t *Terminal) printInfoImpl() {
 		var fillLength int
 		if outputPrinter == nil {
 			output = t.trimMessage(output, maxWidth)
-			fillLength = t.window.Width() - len(output) - 2
+			fillLength = t.window.Width() - len(output) - 1 - t.barCol()
 		} else {
-			fillLength = t.window.Width() - outputLen - 2
+			fillLength = t.window.Width() - outputLen - 1 - t.barCol()
 		}
 		if t.reading {
 			if fillLength >= 2 {
@@ -3635,7 +3649,7 @@ func (t *Terminal) printInfoImpl() {
 		} else {
 			outputPrinter(t.window, maxWidth-1)
 		}
-		if fillLength >= 0 {
+		if fillLength >= 0 && t.barCol() > 0 {
 			t.window.Print(" ") // Margin
 		}
 		return
@@ -3644,7 +3658,7 @@ func (t *Terminal) printInfoImpl() {
 	if t.infoStyle == infoInlineRight {
 		if len(t.infoPrefix) == 0 {
 			move(line, pos, false)
-			newPos := max(pos, t.window.Width()-outputLen-3)
+			newPos := max(pos, t.window.Width()-outputLen-2-t.barCol())
 			t.window.Print(strings.Repeat(" ", newPos-pos))
 			pos = newPos
 			if pos < t.window.Width() {
@@ -3656,12 +3670,12 @@ func (t *Terminal) printInfoImpl() {
 				pos++
 			}
 		} else {
-			pos = max(pos, t.window.Width()-outputLen-util.StringWidth(t.infoPrefix)-1)
+			pos = max(pos, t.window.Width()-outputLen-util.StringWidth(t.infoPrefix)-t.barCol())
 			printInfoPrefix()
 		}
 	}
 
-	maxWidth := t.window.Width() - pos - 1
+	maxWidth := t.window.Width() - pos - t.barCol()
 	if outputPrinter == nil {
 		output = t.trimMessage(output, maxWidth)
 		t.window.CPrint(tui.ColInfo, output)
@@ -3679,15 +3693,15 @@ func (t *Terminal) printInfoImpl() {
 			if !move(line+1, 0, false) {
 				return
 			}
-			printSeparator(t.window.Width()-1, false)
+			printSeparatorToEnd(t.window.Width() - 1)
 		}
 		return
 	}
 
-	fillLength := maxWidth - outputLen - 1
+	fillLength := maxWidth - outputLen - 2 + t.barCol()
 	if fillLength > 0 {
 		t.window.CPrint(tui.ColSeparator, " ")
-		printSeparator(fillLength, false)
+		printSeparatorToEnd(fillLength)
 	}
 }
 
@@ -3806,13 +3820,13 @@ func (t *Terminal) headerIndent(borderShape tui.BorderShape) int {
 func (t *Terminal) headerIndentImpl(base int, borderShape tui.BorderShape) int {
 	indentSize := base
 	if t.listBorderShape.HasLeft() {
-		indentSize += 1 + t.borderWidth
+		indentSize += t.borderWidth
 	}
 	// Section borders with their own left side skip past the list border's left column.
 	// Inline sections also skip it, but only when the list border actually has a left,
 	// since otherwise the inline window starts flush with the list window.
 	if borderShape.HasLeft() || (borderShape == tui.BorderInline && t.listBorderShape.HasLeft()) {
-		indentSize -= 1 + t.borderWidth
+		indentSize -= t.borderWidth
 		if indentSize < 0 {
 			indentSize = 0
 		}
