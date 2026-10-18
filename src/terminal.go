@@ -375,6 +375,7 @@ type Terminal struct {
 	acceptNth            func([]Token, int32) string
 	tabstop              int
 	margin               [4]sizeSpec
+	maxWidth             int
 	padding              [4]sizeSpec
 	unicode              bool
 	listenAddr           *listenAddress
@@ -1094,6 +1095,7 @@ func NewTerminal(opts *Options, eventBox *util.EventBox, executor *util.Executor
 		printQuery:         opts.PrintQuery,
 		history:            opts.History,
 		margin:             opts.Margin,
+		maxWidth:           opts.MaxWidth,
 		padding:            opts.Padding,
 		unicode:            opts.Unicode,
 		listenAddr:         opts.ListenAddr,
@@ -2388,6 +2390,7 @@ func (t *Terminal) adjustMarginAndPadding() (int, int, [4]int, [4]int) {
 		}
 		marginInt[idx] = sizeSpecToInt(idx, sizeSpec) + extraMargin[idx]
 	}
+	marginInt[1] += t.maxWidthMargin(screenWidth, marginInt, extraMargin)
 
 	adjust := func(idx1 int, idx2 int, maximum int, minimum int) {
 		if minimum > maximum {

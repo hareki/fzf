@@ -83,6 +83,7 @@ Usage: fzf [options]
   LAYOUT
     --layout=LAYOUT          Choose layout: [default|reverse|reverse-list]
     --margin=MARGIN          Screen margin (TRBL | TB,RL | T,RL,B | T,R,B,L)
+    --max-width=COLS         Maximum width of the finder, kept at its left margin
     --padding=PADDING        Padding inside border (TRBL | TB,RL | T,RL,B | T,R,B,L)
     --border[=STYLE]         Draw border around the finder
                              [rounded|sharp|bold|block|thinblock|double|dashed|horizontal|vertical|
@@ -667,6 +668,7 @@ type Options struct {
 	Ellipsis          *string
 	Scrollbar         *string
 	Margin            [4]sizeSpec
+	MaxWidth          int
 	Padding           [4]sizeSpec
 	BorderShape       tui.BorderShape
 	ListBorderShape   tui.BorderShape
@@ -3388,6 +3390,13 @@ func parseOptions(index *int, opts *Options, allArgs []string) error {
 			}
 			if opts.Margin, err = parseMargin("margin", str); err != nil {
 				return err
+			}
+		case "--max-width":
+			if opts.MaxWidth, err = nextInt("max width required"); err != nil {
+				return err
+			}
+			if opts.MaxWidth < 0 {
+				return errors.New("max width must be a non-negative integer")
 			}
 		case "--padding":
 			str, err := nextString("padding required (TRBL / TB,RL / T,RL,B / T,R,B,L)")
