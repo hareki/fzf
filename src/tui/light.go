@@ -1566,7 +1566,7 @@ func (w *LightWindow) drawBorder(onlyHorizontal bool) {
 			}
 			if hasLeft {
 				w.Move(y, 0)
-				w.CPrint(color, string(w.border.left)+" ")
+				w.CPrint(color, string(w.border.left))
 			}
 			if hasRight {
 				w.Move(y, w.width-vw-1)
