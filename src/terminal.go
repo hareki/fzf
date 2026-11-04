@@ -590,6 +590,7 @@ const (
 	actChangeFooter
 	actChangeHeaderLabel
 	actChangeFooterLabel
+	actChangeInfoCommand
 	actChangeInputLabel
 	actChangeListLabel
 	actChangeMulti
@@ -677,6 +678,7 @@ const (
 	actTransformFooter
 	actTransformHeaderLabel
 	actTransformFooterLabel
+	actTransformInfoCommand
 	actTransformInputLabel
 	actTransformListLabel
 	actTransformNth
@@ -697,6 +699,7 @@ const (
 	actBgTransformFooter
 	actBgTransformHeaderLabel
 	actBgTransformFooterLabel
+	actBgTransformInfoCommand
 	actBgTransformInputLabel
 	actBgTransformListLabel
 	actBgTransformNth
@@ -765,6 +768,7 @@ func processExecution(action actionType) bool {
 		actTransformFooter,
 		actTransformHeaderLabel,
 		actTransformFooterLabel,
+		actTransformInfoCommand,
 		actTransformInputLabel,
 		actTransformListLabel,
 		actTransformNth,
@@ -782,6 +786,7 @@ func processExecution(action actionType) bool {
 		actBgTransformFooter,
 		actBgTransformHeaderLabel,
 		actBgTransformFooterLabel,
+		actBgTransformInfoCommand,
 		actBgTransformInputLabel,
 		actBgTransformListLabel,
 		actBgTransformNth,
@@ -793,6 +798,7 @@ func processExecution(action actionType) bool {
 		actBgTransformSearch,
 		actPreview,
 		actChangePreview,
+		actChangeInfoCommand,
 		actRefreshPreview,
 		actExecute,
 		actExecuteSilent,
@@ -7463,6 +7469,13 @@ func (t *Terminal) Loop() error {
 					t.footerLabelOpts.label = label
 					t.footerLabel, t.footerLabelLen = t.ansiLabelPrinter(label, &tui.ColFooterLabel, false)
 					req(reqRedrawFooterLabel)
+				})
+			case actChangeInfoCommand, actTransformInfoCommand, actBgTransformInfoCommand:
+				capture(true, func(command string) {
+					if t.infoCommand != command {
+						t.infoCommand = command
+						req(reqInfo)
+					}
 				})
 			case actChangeInputLabel, actTransformInputLabel, actBgTransformInputLabel:
 				capture(true, func(label string) {
