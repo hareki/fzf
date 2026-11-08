@@ -844,6 +844,8 @@ type previewRequest struct {
 	list         [3][]*Item // current, select, and all matched items
 	env          []string
 	query        string
+	lastAction   actionType
+	prompt       string
 }
 
 type previewResult struct {
@@ -6475,6 +6477,8 @@ func (t *Terminal) Loop() error {
 				var commandTemplate string
 				var env []string
 				var query string
+				var lastAction actionType
+				var prompt string
 				initialOffset := 0
 				t.previewBox.Wait(func(events *util.Events) {
 					for req, value := range *events {
@@ -6489,6 +6493,8 @@ func (t *Terminal) Loop() error {
 							items = request.list
 							env = request.env
 							query = request.query
+							lastAction = request.lastAction
+							prompt = request.prompt
 							requested = true
 						}
 					}
@@ -6503,7 +6509,18 @@ func (t *Terminal) Loop() error {
 				version++
 				// We don't display preview window if no match
 				if items[0] != nil {
-					command, tempFiles := t.replacePlaceholder(commandTemplate, false, query, items)
+					// Not t.replacePlaceholder, which reads fields the main loop writes
+					command, tempFiles := replacePlaceholder(replacePlaceholderParams{
+						template:   commandTemplate,
+						stripAnsi:  t.ansi,
+						delimiter:  t.delimiter,
+						printsep:   t.printsep,
+						query:      query,
+						allItems:   items,
+						lastAction: lastAction,
+						prompt:     prompt,
+						executor:   t.executor,
+					})
 					cmd := t.executor.ExecCommand(command, true)
 					cmd.Env = env
 
@@ -6636,7 +6653,7 @@ func (t *Terminal) Loop() error {
 		if len(command) > 0 && t.canPreview() {
 			_, list := t.buildPlusList(command, false)
 			t.cancelPreview()
-			t.previewBox.Set(reqPreviewEnqueue, previewRequest{command, t.evaluateScrollOffset(), list, t.environForPreview(), string(t.input)})
+			t.previewBox.Set(reqPreviewEnqueue, previewRequest{command, t.evaluateScrollOffset(), list, t.environForPreview(), string(t.input), t.lastAction, t.promptString})
 		}
 	}
 
@@ -7251,7 +7268,7 @@ func (t *Terminal) Loop() error {
 						if valid {
 							t.cancelPreview()
 							t.previewBox.Set(reqPreviewEnqueue,
-								previewRequest{t.previewOpts.command, t.evaluateScrollOffset(), list, t.environForPreview(), string(t.input)})
+								previewRequest{t.previewOpts.command, t.evaluateScrollOffset(), list, t.environForPreview(), string(t.input), t.lastAction, t.promptString})
 						}
 					} else {
 						// Discard the preview content so that it won't accidentally appear
